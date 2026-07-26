@@ -1,0 +1,1429 @@
+CREATE TYPE name_type AS OBJECT
+(
+FirstName VARCHAR(25),
+LastName  VARCHAR(25)
+);
+
+
+CREATE TYPE addr_type AS OBJECT
+(
+Street  VARCHAR(30),
+City    VARCHAR(25),
+Country VARCHAR(25)
+);
+
+
+CREATE TYPE contact_type AS OBJECT
+(
+PhoneNumber VARCHAR(15),
+Email       VARCHAR(50)
+);
+
+/* =========================================================
+   PERSON & INHERITANCE TYPES
+   ========================================================= */
+
+CREATE TYPE person_type AS OBJECT
+(
+PersonID INT,
+Name     name_type,
+Address  addr_type,
+Contact  contact_type
+)
+NOT FINAL;
+
+CREATE TYPE customer_type UNDER person_type
+(
+LoyaltyPoints INT,
+DateOfBirth   DATE,
+RegistrationDate DATE
+);
+
+CREATE TYPE employee_type UNDER person_type
+(
+HireDate DATE,
+Salary   NUMBER,
+RoleID   INT
+)
+NOT FINAL;
+
+/* =========================================================
+   EMPLOYEE SUBTYPES
+   ========================================================= */
+
+CREATE TYPE manager_type UNDER employee_type
+(
+Department   VARCHAR(30),
+OfficeNumber VARCHAR(10)
+);
+
+CREATE TYPE cashier_type UNDER employee_type
+(
+RegisterNum VARCHAR(10),
+ShiftTime   VARCHAR(15)
+);
+
+CREATE TYPE technician_type UNDER employee_type
+(
+Specialty VARCHAR(30)
+);
+
+CREATE TYPE janitor_type UNDER employee_type
+(
+AreaAssigned VARCHAR(30),
+ShiftTime    VARCHAR(15)
+);
+
+/* =========================================================
+   THEATER STRUCTURE TYPES
+   ========================================================= */
+
+CREATE TYPE theater_type AS OBJECT
+(
+TheaterID INT,
+Name      VARCHAR(40),
+Location  addr_type
+);
+
+CREATE TYPE hall_type AS OBJECT
+(
+HallID      INT,
+HallName    VARCHAR(30),
+TotalSeats  INT,
+ScreenType  VARCHAR(20),
+SoundSystem VARCHAR(20),
+Theater REF theater_type
+);
+
+CREATE TYPE seat_type AS OBJECT
+(
+SeatID        INT,
+SeatNumber    VARCHAR(10),
+SeatRow       VARCHAR(5),
+SeatType      VARCHAR(15),
+PriceCategory VARCHAR(15),
+Hall REF hall_type
+);
+
+/* =========================================================
+   MOVIE & BOOKING TYPES
+   ========================================================= */
+
+CREATE TYPE movie_type AS OBJECT
+(
+MovieID      INT,
+Title        VARCHAR(50),
+Genre        VARCHAR(20),
+Duration     INT,
+Language     VARCHAR(20),
+AgeRating    VARCHAR(10),
+ReleaseDate  DATE
+);
+
+CREATE TYPE show_type AS OBJECT
+(
+ShowID    INT,
+ShowDate  DATE,
+StartTime VARCHAR(10),
+EndTime   VARCHAR(10),
+Status    VARCHAR(15),
+Movie REF movie_type,
+Hall  REF hall_type
+);
+
+CREATE TYPE booking_type AS OBJECT
+(
+BookingID     INT,
+BookingDate   DATE,
+TotalAmount   NUMBER,
+BookingStatus VARCHAR(15),
+Customer REF customer_type,
+Show     REF show_type
+);
+
+/* =========================================================
+   TRANSACTIONAL TYPES
+   ========================================================= */
+
+CREATE TYPE booking_seat_type AS OBJECT
+(
+BookingID INT,
+SeatID    INT
+);
+
+CREATE TYPE payment_type AS OBJECT
+(
+PaymentID INT,
+Amount    NUMBER,
+PaymentMethod VARCHAR(20),
+PaymentDate   DATE,
+DiscountApplied NUMBER,
+Booking REF booking_type
+);
+
+CREATE TYPE feedback_type AS OBJECT
+(
+FeedbackID   INT,
+Rating       INT,
+FeedbackText VARCHAR(200),
+FeedbackDate DATE,
+Customer REF customer_type
+);
+
+
+/* =========================================================
+   TABLES (OF TYPES) - Correct Order
+   ========================================================= */
+
+/* ---------- BASIC TABLES (No REF dependencies) ---------- */
+
+CREATE TABLE ROLE
+(
+RoleID INT PRIMARY KEY,
+RoleName VARCHAR(25)
+);
+
+CREATE TABLE THEATER OF theater_type
+(
+CONSTRAINT theater_PK PRIMARY KEY (TheaterID)
+);
+
+CREATE TABLE MOVIE OF movie_type
+(
+CONSTRAINT movie_PK PRIMARY KEY (MovieID)
+);
+
+/* ---------- PERSON SUBTYPE TABLES ---------- */
+
+CREATE TABLE CUSTOMER OF customer_type
+(
+CONSTRAINT customer_PK PRIMARY KEY (PersonID)
+);
+
+/* EMPLOYEE table can store employee_type + all subtypes (manager/cashier/technician/janitor) */
+CREATE TABLE EMPLOYEE OF employee_type
+(
+CONSTRAINT employee_PK PRIMARY KEY (PersonID)
+);
+
+/* ---------- TABLES THAT HAVE REF ---------- */
+
+CREATE TABLE HALL OF hall_type
+(
+Theater SCOPE IS THEATER,
+CONSTRAINT hall_PK PRIMARY KEY (HallID)
+);
+
+CREATE TABLE SEAT OF seat_type
+(
+Hall SCOPE IS HALL,
+CONSTRAINT seat_PK PRIMARY KEY (SeatID)
+);
+
+CREATE TABLE SHOW OF show_type
+(
+Movie SCOPE IS MOVIE,
+Hall  SCOPE IS HALL,
+CONSTRAINT show_PK PRIMARY KEY (ShowID)
+);
+
+CREATE TABLE BOOKING OF booking_type
+(
+Customer SCOPE IS CUSTOMER,
+Show     SCOPE IS SHOW,
+CONSTRAINT booking_PK PRIMARY KEY (BookingID)
+);
+
+CREATE TABLE PAYMENT OF payment_type
+(
+Booking SCOPE IS BOOKING,
+CONSTRAINT payment_PK PRIMARY KEY (PaymentID)
+);
+
+CREATE TABLE FEEDBACK OF feedback_type
+(
+Customer SCOPE IS CUSTOMER,
+CONSTRAINT feedback_PK PRIMARY KEY (FeedbackID)
+);
+
+/* ---------- BRIDGE TABLE (EERD: Booking_Seat) ---------- */
+/* In EERD it’s a normal relational bridge (BookingID, SeatID).
+   We'll implement it as a normal table (not object) to match the EERD exactly. */
+
+CREATE TABLE BOOKING_SEAT
+(
+BookingID INT,
+SeatID    INT,
+CONSTRAINT booking_seat_PK PRIMARY KEY (BookingID, SeatID)
+);
+
+
+
+ALTER TABLE ROLE ADD (Description VARCHAR(60));
+
+
+CREATE TYPE user_account_type AS OBJECT
+(
+UserID INT,
+Username VARCHAR(25),
+Password_Hash VARCHAR(60),
+Last_Login DATE,
+Status VARCHAR(15),
+Emp REF employee_type
+);
+
+
+CREATE TYPE distributor_type AS OBJECT
+(
+DistributorID INT,
+DistributorName VARCHAR(50),
+ContactPerson VARCHAR(40),
+ContactNumber VARCHAR(15),
+Email VARCHAR(50),
+Address VARCHAR(60)
+);
+
+
+CREATE TYPE movie_distribution_type AS OBJECT
+(
+Movie REF movie_type,
+Dist REF distributor_type,
+ContractStartDate DATE,
+ContractEndDate DATE,
+RevenueSharePercentage NUMBER
+);
+
+
+CREATE TYPE supplier_type AS OBJECT
+(
+SupplierID INT,
+SupplierName VARCHAR(50),
+ContactNumber VARCHAR(15),
+Email VARCHAR(50),
+Address VARCHAR(60)
+);
+
+
+CREATE TYPE inventory_type AS OBJECT
+(
+ItemID INT,
+ItemName VARCHAR(40),
+Quantity INT,
+UnitPrice NUMBER,
+LastUpdated DATE,
+Th REF theater_type,
+Sup REF supplier_type
+);
+
+
+CREATE TYPE concession_item_type AS OBJECT
+(
+ConcessionID INT,
+ItemName VARCHAR(40),
+Category VARCHAR(20),
+UnitPrice NUMBER,
+AvailableQuantity INT
+);
+
+
+CREATE TYPE concession_order_type AS OBJECT
+(
+OrderID INT,
+OrderDate DATE,
+TotalAmount NUMBER,
+PaymentStatus VARCHAR(15),
+Cust REF customer_type,
+Th REF theater_type
+);
+
+
+CREATE TYPE concession_order_detail_type AS OBJECT
+(
+Ord REF concession_order_type,
+Item REF concession_item_type,
+Quantity INT,
+PricePerUnit NUMBER
+);
+
+
+CREATE TYPE maintenance_request_type AS OBJECT
+(
+RequestID INT,
+IssueDescription VARCHAR(120),
+RequestDate DATE,
+Status VARCHAR(15),
+ResolvedDate DATE,
+Hal REF hall_type,
+ReportedBy REF employee_type
+);
+
+
+CREATE TYPE promotion_type AS OBJECT
+(
+PromoID INT,
+PromoCode VARCHAR(15),
+Description VARCHAR(80),
+DiscountPercentage NUMBER,
+ValidFrom DATE,
+ValidTo DATE,
+Status VARCHAR(15)
+);
+
+
+CREATE TYPE loyalty_transaction_type AS OBJECT
+(
+LoyaltyID INT,
+TransactionDate DATE,
+PointsEarned INT,
+PointsRedeemed INT,
+Remarks VARCHAR(80),
+Cust REF customer_type
+);
+
+
+
+CREATE TYPE system_node_type AS OBJECT
+(
+NodeID INT,
+NodeName VARCHAR(30),
+Location VARCHAR(40),
+IP_Address VARCHAR(20),
+Status VARCHAR(15),
+LastHeartbeat DATE
+);
+
+
+
+CREATE TYPE audit_log_type AS OBJECT
+(
+LogID INT,
+Action VARCHAR(40),
+LogTime DATE,
+IP_Address VARCHAR(20),
+Usr REF user_account_type,
+Node REF system_node_type
+);
+
+
+
+CREATE TABLE USER_ACCOUNT OF user_account_type
+(
+Emp SCOPE IS EMPLOYEE,
+CONSTRAINT user_account_PK PRIMARY KEY (UserID)
+);
+
+
+CREATE TABLE DISTRIBUTOR OF distributor_type
+(
+CONSTRAINT distributor_PK PRIMARY KEY (DistributorID)
+);
+
+
+CREATE TABLE MOVIE_DISTRIBUTION OF movie_distribution_type
+(
+Movie SCOPE IS MOVIE,
+Dist SCOPE IS DISTRIBUTOR
+);
+
+
+CREATE TABLE SUPPLIER OF supplier_type
+(
+CONSTRAINT supplier_PK PRIMARY KEY (SupplierID)
+);
+
+
+CREATE TABLE INVENTORY OF inventory_type
+(
+Th  SCOPE IS THEATER,
+Sup SCOPE IS SUPPLIER,
+CONSTRAINT inventory_PK PRIMARY KEY (ItemID)
+);
+
+
+
+CREATE TABLE CONCESSION_ITEM OF concession_item_type
+(
+CONSTRAINT concession_item_PK PRIMARY KEY (ConcessionID)
+);
+
+
+CREATE TABLE CONCESSION_ORDER OF concession_order_type
+(
+Cust SCOPE IS CUSTOMER,
+Th   SCOPE IS THEATER,
+CONSTRAINT concession_order_PK PRIMARY KEY (OrderID)
+);
+
+
+CREATE TABLE CONCESSION_ORDER_DETAIL OF concession_order_detail_type
+(
+Ord  SCOPE IS CONCESSION_ORDER,
+Item SCOPE IS CONCESSION_ITEM
+);
+
+
+
+CREATE TABLE MAINTENANCE_REQUEST OF maintenance_request_type
+(
+Hal        SCOPE IS HALL,
+ReportedBy SCOPE IS EMPLOYEE,
+CONSTRAINT maintenance_request_PK PRIMARY KEY (RequestID)
+);
+
+
+
+CREATE TABLE PROMOTION OF promotion_type
+(
+CONSTRAINT promotion_PK PRIMARY KEY (PromoID)
+);
+
+
+
+CREATE TABLE LOYALTY_TRANSACTION OF loyalty_transaction_type
+(
+Cust SCOPE IS CUSTOMER,
+CONSTRAINT loyalty_transaction_PK PRIMARY KEY (LoyaltyID)
+);
+
+
+
+CREATE TABLE SYSTEM_NODE OF system_node_type
+(
+CONSTRAINT system_node_PK PRIMARY KEY (NodeID)
+);
+
+
+CREATE TABLE AUDIT_LOG OF audit_log_type
+(
+Usr  SCOPE IS USER_ACCOUNT,
+Node SCOPE IS SYSTEM_NODE,
+CONSTRAINT audit_log_PK PRIMARY KEY (LogID)
+);
+
+
+
+ALTER TABLE BOOKING_SEAT ADD (Price NUMBER, Discount_Applied NUMBER);
+
+-----------------INSERTS---------------------------------
+
+SET SERVEROUTPUT ON;
+
+BEGIN
+  INSERT INTO ROLE VALUES(1,'Admin','System administrator');
+  INSERT INTO ROLE VALUES(2,'Manager','Theater manager role');
+  INSERT INTO ROLE VALUES(3,'Staff','General staff role');
+  INSERT INTO ROLE VALUES(4,'Cashier','Handles ticket payments');
+  INSERT INTO ROLE VALUES(5,'Tech','Technical maintenance');
+  INSERT INTO ROLE VALUES(6,'Auditor','Audit and compliance');
+
+
+  INSERT INTO THEATER VALUES(theater_type(1,'Cairo Cinema',addr_type('Talaat Harb','Cairo','Egypt')));
+  INSERT INTO THEATER VALUES(theater_type(2,'Alex Sea View',addr_type('El Corniche','Alexandria','Egypt')));
+  INSERT INTO THEATER VALUES(theater_type(3,'Mansoura Center',addr_type('Gomhoreya St','Mansoura','Egypt')));
+  INSERT INTO THEATER VALUES(theater_type(4,'Zagazig Stars',addr_type('El Geish St','Zagazig','Egypt')));
+
+
+  INSERT INTO MOVIE VALUES(movie_type(10,'El Feel El Azraq 3','Thriller',130,'Arabic','+16',DATE '2025-07-15'));
+  INSERT INTO MOVIE VALUES(movie_type(11,'Cairo Nights','Romance',115,'Arabic','+12',DATE '2024-12-01'));
+  INSERT INTO MOVIE VALUES(movie_type(12,'Nile Adventure','Action',125,'English','+16',DATE '2025-03-10'));
+  INSERT INTO MOVIE VALUES(movie_type(13,'Alex Comedy','Comedy',105,'Arabic','+12',DATE '2025-05-20'));
+  INSERT INTO MOVIE VALUES(movie_type(14,'Upper Egypt Story','Drama',140,'Arabic','+16',DATE '2025-01-05'));
+  INSERT INTO MOVIE VALUES(movie_type(15,'Desert Escape','Action',118,'English','+16',DATE '2024-11-11'));
+
+
+  INSERT INTO CUSTOMER VALUES(customer_type(101,name_type('Abdullah','Moustafa'),addr_type('Nasr City','Cairo','Egypt'),contact_type('01012345678','abdullah@gmail.com'),220,DATE '2001-03-10',DATE '2025-09-01'));
+  INSERT INTO CUSTOMER VALUES(customer_type(102,name_type('Ahmed','Sherif'),addr_type('Sidi Gaber','Alexandria','Egypt'),contact_type('01122223333','ahmed@outlook.com'),120,DATE '2004-08-18',DATE '2025-09-05'));
+  INSERT INTO CUSTOMER VALUES(customer_type(103,name_type('Mona','Hassan'),addr_type('Smouha','Alexandria','Egypt'),contact_type('01234567890','mona@yahoo.com'),60,DATE '1999-06-22',DATE '2025-09-10'));
+  INSERT INTO CUSTOMER VALUES(customer_type(104,name_type('Karim','Adel'),addr_type('Dokki','Giza','Egypt'),contact_type('01077778888','karim@gmail.com'),180,DATE '2000-02-14',DATE '2025-09-15'));
+  INSERT INTO CUSTOMER VALUES(customer_type(105,name_type('Sara','Mahmoud'),addr_type('El Mahatta','Tanta','Egypt'),contact_type('01555556666','sara@outlook.com'),90,DATE '2002-12-03',DATE '2025-10-01'));
+  INSERT INTO CUSTOMER VALUES(customer_type(106,name_type('Youssef','Fathy'),addr_type('Stanley','Alexandria','Egypt'),contact_type('01099990000','youssef@gmail.com'),30,DATE '1998-09-09',DATE '2025-10-10'));
+
+
+  INSERT INTO EMPLOYEE VALUES(manager_type(201,name_type('Hany','Fathy'),addr_type('Dokki','Giza','Egypt'),contact_type('01011111111','hany@theater.eg'),DATE '2022-01-01',15000,2,'Operations','A-12'));
+  INSERT INTO EMPLOYEE VALUES(cashier_type(202,name_type('Mariam','Ali'),addr_type('Nasr City','Cairo','Egypt'),contact_type('01111112222','mariam@theater.eg'),DATE '2023-03-15',8000,4,'R-01','Evening'));
+  INSERT INTO EMPLOYEE VALUES(technician_type(203,name_type('Omar','Saeed'),addr_type('Sidi Gaber','Alexandria','Egypt'),contact_type('01222223333','omar@theater.eg'),DATE '2023-06-10',9000,5,'Projectors'));
+  INSERT INTO EMPLOYEE VALUES(janitor_type(204,name_type('Mostafa','Gamal'),addr_type('Mansoura','Mansoura','Egypt'),contact_type('01033334444','mostafa@theater.eg'),DATE '2024-02-20',6000,3,'Hall Area','Morning'));
+  INSERT INTO EMPLOYEE VALUES(employee_type(205,name_type('Salma','Ibrahim'),addr_type('Zagazig','Zagazig','Egypt'),contact_type('01500001111','salma@theater.eg'),DATE '2024-05-01',7000,3));
+  INSERT INTO EMPLOYEE VALUES(employee_type(206,name_type('Khaled','Hassan'),addr_type('Heliopolis','Cairo','Egypt'),contact_type('01044445555','khaled@theater.eg'),DATE '2024-06-15',7200,3));
+
+
+  INSERT INTO HALL SELECT hall_type(1,'Cairo Hall 1',120,'2D','Dolby',ref(t)) FROM THEATER t WHERE t.TheaterID=1;
+  INSERT INTO HALL SELECT hall_type(2,'Cairo VIP',60,'3D','Atmos',ref(t)) FROM THEATER t WHERE t.TheaterID=1;
+  INSERT INTO HALL SELECT hall_type(3,'Alex Hall A',100,'2D','Surround',ref(t)) FROM THEATER t WHERE t.TheaterID=2;
+  INSERT INTO HALL SELECT hall_type(4,'Alex Hall B',80,'2D','Dolby',ref(t)) FROM THEATER t WHERE t.TheaterID=2;
+  INSERT INTO HALL SELECT hall_type(5,'Mansoura Main',90,'2D','Surround',ref(t)) FROM THEATER t WHERE t.TheaterID=3;
+  INSERT INTO HALL SELECT hall_type(6,'Zagazig Hall',70,'2D','Dolby',ref(t)) FROM THEATER t WHERE t.TheaterID=4;
+
+
+  INSERT INTO SEAT SELECT seat_type(1001,'A1','A','Regular','Standard',ref(h)) FROM HALL h WHERE h.HallID=1;
+  INSERT INTO SEAT SELECT seat_type(1002,'A2','A','Regular','Standard',ref(h)) FROM HALL h WHERE h.HallID=1;
+  INSERT INTO SEAT SELECT seat_type(1003,'B1','B','VIP','Premium',ref(h)) FROM HALL h WHERE h.HallID=2;
+  INSERT INTO SEAT SELECT seat_type(1004,'B2','B','VIP','Premium',ref(h)) FROM HALL h WHERE h.HallID=2;
+  INSERT INTO SEAT SELECT seat_type(1005,'C1','C','Regular','Standard',ref(h)) FROM HALL h WHERE h.HallID=3;
+  INSERT INTO SEAT SELECT seat_type(1006,'C2','C','Regular','Standard',ref(h)) FROM HALL h WHERE h.HallID=3;
+
+
+  INSERT INTO SHOW
+  SELECT show_type(2001,DATE '2025-12-20','19:00','21:10','Scheduled',ref(m),ref(h))
+  FROM MOVIE m, HALL h WHERE m.MovieID=10 AND h.HallID=2;
+
+  INSERT INTO SHOW
+  SELECT show_type(2002,DATE '2025-12-20','21:30','23:25','Scheduled',ref(m),ref(h))
+  FROM MOVIE m, HALL h WHERE m.MovieID=11 AND h.HallID=1;
+
+  INSERT INTO SHOW
+  SELECT show_type(2003,DATE '2025-12-21','18:00','20:05','Scheduled',ref(m),ref(h))
+  FROM MOVIE m, HALL h WHERE m.MovieID=12 AND h.HallID=3;
+
+  INSERT INTO SHOW
+  SELECT show_type(2004,DATE '2025-12-21','20:30','22:15','Scheduled',ref(m),ref(h))
+  FROM MOVIE m, HALL h WHERE m.MovieID=13 AND h.HallID=4;
+
+  INSERT INTO SHOW
+  SELECT show_type(2005,DATE '2025-12-22','17:00','19:20','Scheduled',ref(m),ref(h))
+  FROM MOVIE m, HALL h WHERE m.MovieID=14 AND h.HallID=5;
+
+  INSERT INTO SHOW
+  SELECT show_type(2006,DATE '2025-12-22','19:45','21:43','Scheduled',ref(m),ref(h))
+  FROM MOVIE m, HALL h WHERE m.MovieID=15 AND h.HallID=6;
+
+
+  INSERT INTO BOOKING
+  SELECT booking_type(5001,DATE '2025-12-12',260,'Confirmed',ref(c),ref(s))
+  FROM CUSTOMER c, SHOW s WHERE c.PersonID=101 AND s.ShowID=2001;
+
+  INSERT INTO BOOKING
+  SELECT booking_type(5002,DATE '2025-12-12',130,'Confirmed',ref(c),ref(s))
+  FROM CUSTOMER c, SHOW s WHERE c.PersonID=102 AND s.ShowID=2002;
+
+  INSERT INTO BOOKING
+  SELECT booking_type(5003,DATE '2025-12-12',180,'Pending',ref(c),ref(s))
+  FROM CUSTOMER c, SHOW s WHERE c.PersonID=103 AND s.ShowID=2003;
+
+  INSERT INTO BOOKING
+  SELECT booking_type(5004,DATE '2025-12-13',220,'Confirmed',ref(c),ref(s))
+  FROM CUSTOMER c, SHOW s WHERE c.PersonID=104 AND s.ShowID=2004;
+
+  INSERT INTO BOOKING
+  SELECT booking_type(5005,DATE '2025-12-13',150,'Cancelled',ref(c),ref(s))
+  FROM CUSTOMER c, SHOW s WHERE c.PersonID=105 AND s.ShowID=2005;
+
+  INSERT INTO BOOKING
+  SELECT booking_type(5006,DATE '2025-12-13',300,'Confirmed',ref(c),ref(s))
+  FROM CUSTOMER c, SHOW s WHERE c.PersonID=106 AND s.ShowID=2006;
+
+
+  INSERT INTO PAYMENT SELECT payment_type(7001,260,'Cash',DATE '2025-12-12',0,ref(b)) FROM BOOKING b WHERE b.BookingID=5001;
+  INSERT INTO PAYMENT SELECT payment_type(7002,130,'Card',DATE '2025-12-12',10,ref(b)) FROM BOOKING b WHERE b.BookingID=5002;
+  INSERT INTO PAYMENT SELECT payment_type(7003,180,'VodafoneCash',DATE '2025-12-12',0,ref(b)) FROM BOOKING b WHERE b.BookingID=5003;
+  INSERT INTO PAYMENT SELECT payment_type(7004,220,'Card',DATE '2025-12-13',5,ref(b)) FROM BOOKING b WHERE b.BookingID=5004;
+  INSERT INTO PAYMENT SELECT payment_type(7005,150,'Cash',DATE '2025-12-13',0,ref(b)) FROM BOOKING b WHERE b.BookingID=5005;
+  INSERT INTO PAYMENT SELECT payment_type(7006,300,'Card',DATE '2025-12-13',15,ref(b)) FROM BOOKING b WHERE b.BookingID=5006;
+
+
+  INSERT INTO FEEDBACK SELECT feedback_type(9001,5,'Excellent experience!',DATE '2025-12-13',ref(c)) FROM CUSTOMER c WHERE c.PersonID=101;
+  INSERT INTO FEEDBACK SELECT feedback_type(9002,4,'Nice hall and sound.',DATE '2025-12-13',ref(c)) FROM CUSTOMER c WHERE c.PersonID=102;
+  INSERT INTO FEEDBACK SELECT feedback_type(9003,3,'Seats were okay.',DATE '2025-12-13',ref(c)) FROM CUSTOMER c WHERE c.PersonID=103;
+  INSERT INTO FEEDBACK SELECT feedback_type(9004,5,'VIP hall was perfect.',DATE '2025-12-13',ref(c)) FROM CUSTOMER c WHERE c.PersonID=104;
+
+
+  INSERT INTO BOOKING_SEAT VALUES(5001,1003,260,0);
+  INSERT INTO BOOKING_SEAT VALUES(5002,1001,130,10);
+  INSERT INTO BOOKING_SEAT VALUES(5003,1005,180,0);
+  INSERT INTO BOOKING_SEAT VALUES(5004,1006,220,5);
+  INSERT INTO BOOKING_SEAT VALUES(5006,1004,300,15);
+  INSERT INTO BOOKING_SEAT VALUES(5001,1004,260,0);
+
+
+  INSERT INTO USER_ACCOUNT SELECT user_account_type(3001,'hany_ops','HASH001',DATE '2025-12-12','Active',ref(e)) FROM EMPLOYEE e WHERE e.PersonID=201;
+  INSERT INTO USER_ACCOUNT SELECT user_account_type(3002,'mariam_cash','HASH002',DATE '2025-12-12','Active',ref(e)) FROM EMPLOYEE e WHERE e.PersonID=202;
+  INSERT INTO USER_ACCOUNT SELECT user_account_type(3003,'omar_tech','HASH003',DATE '2025-12-11','Active',ref(e)) FROM EMPLOYEE e WHERE e.PersonID=203;
+  INSERT INTO USER_ACCOUNT SELECT user_account_type(3004,'mostafa_clean','HASH004',DATE '2025-12-10','Active',ref(e)) FROM EMPLOYEE e WHERE e.PersonID=204;
+  INSERT INTO USER_ACCOUNT SELECT user_account_type(3005,'salma_usher','HASH005',DATE '2025-12-12','Active',ref(e)) FROM EMPLOYEE e WHERE e.PersonID=205;
+  INSERT INTO USER_ACCOUNT SELECT user_account_type(3006,'khaled_sec','HASH006',DATE '2025-12-12','Active',ref(e)) FROM EMPLOYEE e WHERE e.PersonID=206;
+
+
+  INSERT INTO DISTRIBUTOR VALUES(distributor_type(4001,'Rotana Distribution','Ali Hassan','01088887777','rotana@dist.eg','Cairo'));
+  INSERT INTO DISTRIBUTOR VALUES(distributor_type(4002,'Arab Media','Maged Samir','01177776666','arabmedia@dist.eg','Alexandria'));
+  INSERT INTO DISTRIBUTOR VALUES(distributor_type(4003,'Nile Films','Nour Adel','01266665555','nilefilms@dist.eg','Giza'));
+  INSERT INTO DISTRIBUTOR VALUES(distributor_type(4004,'Delta Pictures','Tamer Said','01544443333','delta@dist.eg','Mansoura'));
+
+
+  INSERT INTO MOVIE_DISTRIBUTION
+  SELECT movie_distribution_type(ref(m),ref(d),DATE '2025-01-01',DATE '2025-12-31',30)
+  FROM MOVIE m, DISTRIBUTOR d WHERE m.MovieID=10 AND d.DistributorID=4001;
+
+  INSERT INTO MOVIE_DISTRIBUTION
+  SELECT movie_distribution_type(ref(m),ref(d),DATE '2025-02-01',DATE '2025-11-30',25)
+  FROM MOVIE m, DISTRIBUTOR d WHERE m.MovieID=11 AND d.DistributorID=4002;
+
+  INSERT INTO MOVIE_DISTRIBUTION
+  SELECT movie_distribution_type(ref(m),ref(d),DATE '2025-03-01',DATE '2025-10-31',20)
+  FROM MOVIE m, DISTRIBUTOR d WHERE m.MovieID=12 AND d.DistributorID=4003;
+
+  INSERT INTO MOVIE_DISTRIBUTION
+  SELECT movie_distribution_type(ref(m),ref(d),DATE '2025-04-01',DATE '2025-09-30',22)
+  FROM MOVIE m, DISTRIBUTOR d WHERE m.MovieID=13 AND d.DistributorID=4004;
+
+  INSERT INTO MOVIE_DISTRIBUTION
+  SELECT movie_distribution_type(ref(m),ref(d),DATE '2025-05-01',DATE '2025-12-31',28)
+  FROM MOVIE m, DISTRIBUTOR d WHERE m.MovieID=14 AND d.DistributorID=4001;
+
+  INSERT INTO MOVIE_DISTRIBUTION
+  SELECT movie_distribution_type(ref(m),ref(d),DATE '2025-06-01',DATE '2025-12-31',26)
+  FROM MOVIE m, DISTRIBUTOR d WHERE m.MovieID=15 AND d.DistributorID=4002;
+
+
+  INSERT INTO SUPPLIER VALUES(supplier_type(6001,'Snack Supply Co','01055550001','snacks@supply.eg','Cairo'));
+  INSERT INTO SUPPLIER VALUES(supplier_type(6002,'Delta Foods','01155550002','deltafoods@supply.eg','Alexandria'));
+  INSERT INTO SUPPLIER VALUES(supplier_type(6003,'Nile Drinks','01255550003','niledrinks@supply.eg','Giza'));
+  INSERT INTO SUPPLIER VALUES(supplier_type(6004,'Mansoura Snacks','01555550004','mansnacks@supply.eg','Mansoura'));
+
+
+  INSERT INTO INVENTORY
+  SELECT inventory_type(8001,'Popcorn Kernels',200,15,DATE '2025-12-10',ref(t),ref(s))
+  FROM THEATER t, SUPPLIER s WHERE t.TheaterID=1 AND s.SupplierID=6001;
+
+  INSERT INTO INVENTORY
+  SELECT inventory_type(8002,'Soft Drinks',300,12,DATE '2025-12-10',ref(t),ref(s))
+  FROM THEATER t, SUPPLIER s WHERE t.TheaterID=1 AND s.SupplierID=6003;
+
+  INSERT INTO INVENTORY
+  SELECT inventory_type(8003,'Nachos',150,18,DATE '2025-12-11',ref(t),ref(s))
+  FROM THEATER t, SUPPLIER s WHERE t.TheaterID=2 AND s.SupplierID=6002;
+
+  INSERT INTO INVENTORY
+  SELECT inventory_type(8004,'Chocolate Bars',120,10,DATE '2025-12-11',ref(t),ref(s))
+  FROM THEATER t, SUPPLIER s WHERE t.TheaterID=2 AND s.SupplierID=6001;
+
+  INSERT INTO INVENTORY
+  SELECT inventory_type(8005,'Water Bottles',400,6,DATE '2025-12-12',ref(t),ref(s))
+  FROM THEATER t, SUPPLIER s WHERE t.TheaterID=3 AND s.SupplierID=6003;
+
+  INSERT INTO INVENTORY
+  SELECT inventory_type(8006,'Candy',250,8,DATE '2025-12-12',ref(t),ref(s))
+  FROM THEATER t, SUPPLIER s WHERE t.TheaterID=4 AND s.SupplierID=6004;
+
+
+  INSERT INTO CONCESSION_ITEM VALUES(concession_item_type(9001,'Popcorn','Snack',45,200));
+  INSERT INTO CONCESSION_ITEM VALUES(concession_item_type(9002,'Cola','Drink',30,300));
+  INSERT INTO CONCESSION_ITEM VALUES(concession_item_type(9003,'Water','Drink',15,400));
+  INSERT INTO CONCESSION_ITEM VALUES(concession_item_type(9004,'Nachos','Snack',55,150));
+  INSERT INTO CONCESSION_ITEM VALUES(concession_item_type(9005,'Chocolate','Snack',25,120));
+  INSERT INTO CONCESSION_ITEM VALUES(concession_item_type(9006,'Candy','Snack',20,250));
+
+
+  INSERT INTO CONCESSION_ORDER
+  SELECT concession_order_type(9101,DATE '2025-12-12',75,'Paid',ref(c),ref(t))
+  FROM CUSTOMER c, THEATER t WHERE c.PersonID=101 AND t.TheaterID=1;
+
+  INSERT INTO CONCESSION_ORDER
+  SELECT concession_order_type(9102,DATE '2025-12-12',45,'Paid',ref(c),ref(t))
+  FROM CUSTOMER c, THEATER t WHERE c.PersonID=102 AND t.TheaterID=1;
+
+  INSERT INTO CONCESSION_ORDER
+  SELECT concession_order_type(9103,DATE '2025-12-12',60,'Paid',ref(c),ref(t))
+  FROM CUSTOMER c, THEATER t WHERE c.PersonID=103 AND t.TheaterID=2;
+
+  INSERT INTO CONCESSION_ORDER
+  SELECT concession_order_type(9104,DATE '2025-12-13',30,'Pending',ref(c),ref(t))
+  FROM CUSTOMER c, THEATER t WHERE c.PersonID=104 AND t.TheaterID=2;
+
+  INSERT INTO CONCESSION_ORDER
+  SELECT concession_order_type(9105,DATE '2025-12-13',70,'Paid',ref(c),ref(t))
+  FROM CUSTOMER c, THEATER t WHERE c.PersonID=105 AND t.TheaterID=3;
+
+  INSERT INTO CONCESSION_ORDER
+  SELECT concession_order_type(9106,DATE '2025-12-13',40,'Paid',ref(c),ref(t))
+  FROM CUSTOMER c, THEATER t WHERE c.PersonID=106 AND t.TheaterID=4;
+
+
+  INSERT INTO CONCESSION_ORDER_DETAIL
+  SELECT concession_order_detail_type(ref(o),ref(i),1,45)
+  FROM CONCESSION_ORDER o, CONCESSION_ITEM i WHERE o.OrderID=9101 AND i.ConcessionID=9001;
+
+  INSERT INTO CONCESSION_ORDER_DETAIL
+  SELECT concession_order_detail_type(ref(o),ref(i),1,30)
+  FROM CONCESSION_ORDER o, CONCESSION_ITEM i WHERE o.OrderID=9101 AND i.ConcessionID=9002;
+
+  INSERT INTO CONCESSION_ORDER_DETAIL
+  SELECT concession_order_detail_type(ref(o),ref(i),1,45)
+  FROM CONCESSION_ORDER o, CONCESSION_ITEM i WHERE o.OrderID=9102 AND i.ConcessionID=9001;
+
+  INSERT INTO CONCESSION_ORDER_DETAIL
+  SELECT concession_order_detail_type(ref(o),ref(i),2,15)
+  FROM CONCESSION_ORDER o, CONCESSION_ITEM i WHERE o.OrderID=9103 AND i.ConcessionID=9003;
+
+  INSERT INTO CONCESSION_ORDER_DETAIL
+  SELECT concession_order_detail_type(ref(o),ref(i),1,55)
+  FROM CONCESSION_ORDER o, CONCESSION_ITEM i WHERE o.OrderID=9105 AND i.ConcessionID=9004;
+
+  INSERT INTO CONCESSION_ORDER_DETAIL
+  SELECT concession_order_detail_type(ref(o),ref(i),2,20)
+  FROM CONCESSION_ORDER o, CONCESSION_ITEM i WHERE o.OrderID=9106 AND i.ConcessionID=9006;
+
+
+  INSERT INTO MAINTENANCE_REQUEST
+  SELECT maintenance_request_type(9501,'Projector needs calibration',DATE '2025-12-10','Open',NULL,ref(h),ref(e))
+  FROM HALL h, EMPLOYEE e WHERE h.HallID=2 AND e.PersonID=203;
+
+  INSERT INTO MAINTENANCE_REQUEST
+  SELECT maintenance_request_type(9502,'Seat row A cleaning required',DATE '2025-12-11','In Progress',NULL,ref(h),ref(e))
+  FROM HALL h, EMPLOYEE e WHERE h.HallID=1 AND e.PersonID=204;
+
+  INSERT INTO MAINTENANCE_REQUEST
+  SELECT maintenance_request_type(9503,'Sound system check',DATE '2025-12-12','Open',NULL,ref(h),ref(e))
+  FROM HALL h, EMPLOYEE e WHERE h.HallID=3 AND e.PersonID=203;
+
+  INSERT INTO MAINTENANCE_REQUEST
+  SELECT maintenance_request_type(9504,'Air conditioning issue',DATE '2025-12-12','Resolved',DATE '2025-12-13',ref(h),ref(e))
+  FROM HALL h, EMPLOYEE e WHERE h.HallID=4 AND e.PersonID=201;
+
+
+  INSERT INTO PROMOTION VALUES(promotion_type(9701,'NEWYEAR','New Year Offer',15,DATE '2025-12-20',DATE '2026-01-05','Active'));
+  INSERT INTO PROMOTION VALUES(promotion_type(9702,'VIP10','VIP Hall Discount',10,DATE '2025-12-01',DATE '2025-12-31','Active'));
+  INSERT INTO PROMOTION VALUES(promotion_type(9703,'STUDENT','Student Discount',12,DATE '2025-11-01',DATE '2025-12-31','Active'));
+  INSERT INTO PROMOTION VALUES(promotion_type(9704,'FLASH','Flash Weekend Sale',8,DATE '2025-12-13',DATE '2025-12-15','Active'));
+
+
+  INSERT INTO LOYALTY_TRANSACTION SELECT loyalty_transaction_type(9901,DATE '2025-12-12',5,0,'Booking points',ref(c)) FROM CUSTOMER c WHERE c.PersonID=101;
+  INSERT INTO LOYALTY_TRANSACTION SELECT loyalty_transaction_type(9902,DATE '2025-12-12',3,0,'Booking points',ref(c)) FROM CUSTOMER c WHERE c.PersonID=102;
+  INSERT INTO LOYALTY_TRANSACTION SELECT loyalty_transaction_type(9903,DATE '2025-12-12',0,10,'Redeemed for discount',ref(c)) FROM CUSTOMER c WHERE c.PersonID=103;
+  INSERT INTO LOYALTY_TRANSACTION SELECT loyalty_transaction_type(9904,DATE '2025-12-13',4,0,'Booking points',ref(c)) FROM CUSTOMER c WHERE c.PersonID=104;
+  INSERT INTO LOYALTY_TRANSACTION SELECT loyalty_transaction_type(9905,DATE '2025-12-13',2,0,'Concession order points',ref(c)) FROM CUSTOMER c WHERE c.PersonID=105;
+  INSERT INTO LOYALTY_TRANSACTION SELECT loyalty_transaction_type(9906,DATE '2025-12-13',1,0,'Concession order points',ref(c)) FROM CUSTOMER c WHERE c.PersonID=106;
+
+
+  INSERT INTO SYSTEM_NODE VALUES(system_node_type(1101,'NODE_CAIRO','Cairo DC','192.168.1.10','Online',DATE '2025-12-13'));
+  INSERT INTO SYSTEM_NODE VALUES(system_node_type(1102,'NODE_ALEX','Alex DC','192.168.1.20','Online',DATE '2025-12-13'));
+  INSERT INTO SYSTEM_NODE VALUES(system_node_type(1103,'NODE_MANS','Mansoura DC','192.168.1.30','Online',DATE '2025-12-13'));
+  INSERT INTO SYSTEM_NODE VALUES(system_node_type(1104,'NODE_ZAG','Zagazig DC','192.168.1.40','Maintenance',DATE '2025-12-12'));
+
+
+  INSERT INTO AUDIT_LOG
+  SELECT audit_log_type(12001,'LOGIN',DATE '2025-12-12','10.0.0.1',ref(u),ref(n))
+  FROM USER_ACCOUNT u, SYSTEM_NODE n WHERE u.UserID=3001 AND n.NodeID=1101;
+
+  INSERT INTO AUDIT_LOG
+  SELECT audit_log_type(12002,'CREATE_BOOKING',DATE '2025-12-12','10.0.0.2',ref(u),ref(n))
+  FROM USER_ACCOUNT u, SYSTEM_NODE n WHERE u.UserID=3002 AND n.NodeID=1101;
+
+  INSERT INTO AUDIT_LOG
+  SELECT audit_log_type(12003,'UPDATE_SHOW',DATE '2025-12-12','10.0.0.3',ref(u),ref(n))
+  FROM USER_ACCOUNT u, SYSTEM_NODE n WHERE u.UserID=3003 AND n.NodeID=1102;
+
+  INSERT INTO AUDIT_LOG
+  SELECT audit_log_type(12004,'VIEW_REPORT',DATE '2025-12-13','10.0.0.4',ref(u),ref(n))
+  FROM USER_ACCOUNT u, SYSTEM_NODE n WHERE u.UserID=3001 AND n.NodeID=1102;
+
+  INSERT INTO AUDIT_LOG
+  SELECT audit_log_type(12005,'LOGOUT',DATE '2025-12-13','10.0.0.5',ref(u),ref(n))
+  FROM USER_ACCOUNT u, SYSTEM_NODE n WHERE u.UserID=3005 AND n.NodeID=1103;
+
+  INSERT INTO AUDIT_LOG
+  SELECT audit_log_type(12006,'MAINTENANCE_UPDATE',DATE '2025-12-13','10.0.0.6',ref(u),ref(n))
+  FROM USER_ACCOUNT u, SYSTEM_NODE n WHERE u.UserID=3003 AND n.NodeID=1104;
+
+------------------CURSORS--------------------------------
+
+
+DECLARE
+  CURSOR c_booking IS
+    SELECT BookingID, TotalAmount
+    FROM BOOKING;
+
+  v_id BOOKING.BookingID%TYPE;
+  v_amount BOOKING.TotalAmount%TYPE;
+BEGIN
+  OPEN c_booking;
+
+  LOOP
+    FETCH c_booking INTO v_id, v_amount;
+    EXIT WHEN c_booking%NOTFOUND;
+
+    IF v_amount >= 300 THEN
+      DBMS_OUTPUT.PUT_LINE('Booking ' || v_id || ': High value');
+    ELSE
+      DBMS_OUTPUT.PUT_LINE('Booking ' || v_id || ': Normal value');
+    END IF;
+
+  END LOOP;
+
+  CLOSE c_booking;
+END;
+
+
+
+
+DECLARE
+  v_level VARCHAR2(15);
+BEGIN
+  FOR c IN (SELECT PersonID, LoyaltyPoints FROM CUSTOMER) LOOP
+
+    CASE
+      WHEN c.LoyaltyPoints >= 200 THEN v_level := 'Gold';
+      WHEN c.LoyaltyPoints >= 100 THEN v_level := 'Silver';
+      ELSE v_level := 'Bronze';
+    END CASE;
+
+    DBMS_OUTPUT.PUT_LINE(
+      'Customer ' || c.PersonID || ' level: ' || v_level
+    );
+
+  END LOOP;
+END;
+
+
+
+
+BEGIN
+  FOR m IN (SELECT Title, Duration FROM MOVIE) LOOP
+
+    IF m.Duration > 120 THEN
+      DBMS_OUTPUT.PUT_LINE(
+        m.Title || ' is a long movie'
+      );
+    ELSE
+      DBMS_OUTPUT.PUT_LINE(
+        m.Title || ' is a short movie'
+      );
+    END IF;
+
+  END LOOP;
+END;
+
+
+
+DECLARE
+  CURSOR c_seat IS
+    SELECT SeatID FROM SEAT;
+
+  v_count NUMBER := 0;
+BEGIN
+  FOR s IN c_seat LOOP
+    v_count := v_count + 1;
+  END LOOP;
+
+  DBMS_OUTPUT.PUT_LINE(
+    'Total number of seats: ' || v_count
+  );
+END;
+
+
+-------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+------------------------------------Procedures---------------------------
+
+
+CREATE OR REPLACE PROCEDURE proc_create_booking
+(
+  p_booking_id      IN NUMBER,
+  p_customer_id     IN NUMBER,
+  p_show_id         IN NUMBER,
+  p_total_amount    IN NUMBER,
+  p_add_points      IN NUMBER DEFAULT 0
+)
+IS
+  v_status VARCHAR2(15);
+BEGIN
+  v_status := CASE WHEN p_total_amount > 0 THEN 'Confirmed' ELSE 'Pending' END;
+
+  INSERT INTO BOOKING
+  SELECT booking_type(p_booking_id, SYSDATE, p_total_amount, v_status, REF(c), REF(s))
+  FROM CUSTOMER c, SHOW s
+  WHERE c.PersonID = p_customer_id
+    AND s.ShowID    = p_show_id;
+
+  IF SQL%ROWCOUNT = 0 THEN
+    DBMS_OUTPUT.PUT_LINE('X  Booking not created (customer/show not found).');
+    RETURN;
+  END IF;
+
+  IF p_add_points > 0 THEN
+    UPDATE CUSTOMER
+    SET LoyaltyPoints = NVL(LoyaltyPoints,0) + p_add_points
+    WHERE PersonID = p_customer_id;
+  END IF;
+
+  DBMS_OUTPUT.PUT_LINE(' Booking ' || p_booking_id || ' created as ' || v_status);
+END;
+
+
+
+
+
+
+
+
+CREATE OR REPLACE PROCEDURE proc_add_seat_to_booking
+(
+  p_booking_id  IN NUMBER,
+  p_seat_id     IN NUMBER,
+  p_price       IN NUMBER,
+  p_discount    IN NUMBER DEFAULT 0
+)
+IS
+  v_exists NUMBER;
+BEGIN
+  SELECT COUNT(*)
+  INTO v_exists
+  FROM BOOKING_SEAT
+  WHERE BookingID = p_booking_id
+    AND SeatID    = p_seat_id;
+
+  IF v_exists > 0 THEN
+    DBMS_OUTPUT.PUT_LINE(' Seat already added to this booking.');
+    RETURN;
+  END IF;
+
+  INSERT INTO BOOKING_SEAT(BookingID, SeatID, Price, Discount_Applied)
+  VALUES(p_booking_id, p_seat_id, p_price, p_discount);
+
+  DBMS_OUTPUT.PUT_LINE(' Seat ' || p_seat_id || ' added to booking ' || p_booking_id);
+END;
+
+
+
+
+
+
+
+CREATE OR REPLACE PROCEDURE proc_recalc_booking_total
+(
+  p_booking_id IN NUMBER
+)
+IS
+  v_total NUMBER := 0;
+BEGIN
+  SELECT NVL(SUM(NVL(Price,0) - NVL(Discount_Applied,0)),0)
+  INTO v_total
+  FROM BOOKING_SEAT
+  WHERE BookingID = p_booking_id;
+
+  UPDATE BOOKING
+  SET TotalAmount = v_total
+  WHERE BookingID = p_booking_id;
+
+  IF SQL%ROWCOUNT = 0 THEN
+    DBMS_OUTPUT.PUT_LINE(' Booking not found: ' || p_booking_id);
+  ELSE
+    DBMS_OUTPUT.PUT_LINE(' Booking ' || p_booking_id || ' total updated to ' || v_total);
+  END IF;
+END;
+
+
+
+
+
+
+
+CREATE OR REPLACE PROCEDURE proc_record_payment
+(
+  p_payment_id    IN NUMBER,
+  p_booking_id    IN NUMBER,
+  p_method        IN VARCHAR2,
+  p_discount      IN NUMBER DEFAULT 0
+)
+IS
+  v_amount   NUMBER;
+  v_status   VARCHAR2(15);
+BEGIN
+  SELECT TotalAmount, BookingStatus
+  INTO v_amount, v_status
+  FROM BOOKING
+  WHERE BookingID = p_booking_id;
+
+  IF v_status = 'Cancelled' THEN
+    DBMS_OUTPUT.PUT_LINE(' Cannot pay for a Cancelled booking.');
+    RETURN;
+  END IF;
+
+  INSERT INTO PAYMENT
+  SELECT payment_type(p_payment_id, v_amount, p_method, SYSDATE, p_discount, REF(b))
+  FROM BOOKING b
+  WHERE b.BookingID = p_booking_id;
+
+  UPDATE BOOKING
+  SET BookingStatus = 'Confirmed'
+  WHERE BookingID = p_booking_id;
+
+  DBMS_OUTPUT.PUT_LINE(' Payment ' || p_payment_id || ' recorded for booking ' || p_booking_id);
+END;
+
+
+
+
+
+------------------Procedure testing ----------------------------------
+
+BEGIN
+  proc_create_booking(5012, 101, 2001, 0, 5);
+  proc_add_seat_to_booking(5012, 1001, 120, 0);
+  proc_add_seat_to_booking(5012, 1002, 120, 10);
+  proc_recalc_booking_total(5012);
+
+  proc_record_payment(7011, 5012, 'Cash', 0);
+
+END;
+
+-----------------------------------------------------------------------
+
+-----------------------------------Functions---------------------------
+
+
+CREATE OR REPLACE FUNCTION fn_booking_total
+(
+  p_booking_id IN NUMBER
+)
+RETURN NUMBER
+IS
+  v_total NUMBER;
+BEGIN
+  SELECT NVL(SUM(NVL(Price,0) - NVL(Discount_Applied,0)),0)
+  INTO v_total
+  FROM BOOKING_SEAT
+  WHERE BookingID = p_booking_id;
+
+  RETURN v_total;
+END;
+
+
+BEGIN
+  DBMS_OUTPUT.PUT_LINE(
+    'Booking 5001 total = ' || fn_booking_total(5001)
+  );
+END;
+
+
+
+
+
+
+
+CREATE OR REPLACE FUNCTION fn_customer_level
+(
+  p_customer_id IN NUMBER
+)
+RETURN VARCHAR2
+IS
+  v_points CUSTOMER.LoyaltyPoints%TYPE;
+BEGIN
+  SELECT LoyaltyPoints
+  INTO v_points
+  FROM CUSTOMER
+  WHERE PersonID = p_customer_id;
+
+  IF v_points >= 200 THEN
+    RETURN 'Gold';
+  ELSIF v_points >= 100 THEN
+    RETURN 'Silver';
+  ELSE
+    RETURN 'Bronze';
+  END IF;
+END;
+
+
+BEGIN
+  DBMS_OUTPUT.PUT_LINE(
+    'Customer 101 level = ' || fn_customer_level(101)
+  );
+END;
+
+
+
+
+
+
+CREATE OR REPLACE FUNCTION fn_hall_seat_count
+(
+  p_hall_id IN NUMBER
+)
+RETURN NUMBER
+IS
+  v_count NUMBER;
+BEGIN
+  SELECT COUNT(*)
+  INTO v_count
+  FROM SEAT
+  WHERE DEREF(Hall).HallID = p_hall_id;
+
+  RETURN v_count;
+END;
+
+
+BEGIN
+  DBMS_OUTPUT.PUT_LINE(
+    'Seats in Hall 1 = ' || fn_hall_seat_count(1)
+  );
+END;
+
+
+
+
+
+
+
+
+CREATE OR REPLACE FUNCTION fn_is_vip_show
+(
+  p_show_id IN NUMBER
+)
+RETURN VARCHAR2
+IS
+  v_count NUMBER;
+BEGIN
+  SELECT COUNT(*)
+  INTO v_count
+  FROM SEAT s
+  JOIN SHOW sh
+    ON DEREF(s.Hall).HallID = DEREF(sh.Hall).HallID
+  WHERE sh.ShowID = p_show_id
+    AND s.SeatType = 'VIP';
+
+  IF v_count > 0 THEN
+    RETURN 'YES';
+  ELSE
+    RETURN 'NO';
+  END IF;
+END;
+
+
+BEGIN
+  DBMS_OUTPUT.PUT_LINE(
+    'Show 2001 VIP? ' || fn_is_vip_show(2001)
+  );
+END;
+
+
+
+
+
+
+
+CREATE OR REPLACE FUNCTION fn_paid_amount
+(
+  p_booking_id IN NUMBER
+)
+RETURN NUMBER
+IS
+  v_sum NUMBER;
+BEGIN
+  SELECT NVL(SUM(Amount),0)
+  INTO v_sum
+  FROM PAYMENT
+  WHERE DEREF(Booking).BookingID = p_booking_id;
+
+  RETURN v_sum;
+END;
+
+
+BEGIN
+  DBMS_OUTPUT.PUT_LINE(
+    'Paid for booking 5001 = ' || fn_paid_amount(5001)
+  );
+END;
+
+
+-------------------------End of Functions-----------------------
+
+
+
+
+
+
+
+----------------------------Package-----------------------------
+
+
+
+
+
+
+CREATE OR REPLACE PACKAGE booking_pkg AS
+
+  PROCEDURE create_booking(
+    p_booking_id  IN NUMBER,
+    p_customer_id IN NUMBER,
+    p_show_id     IN NUMBER
+  );
+
+  PROCEDURE add_seat(
+    p_booking_id IN NUMBER,
+    p_seat_id    IN NUMBER,
+    p_price      IN NUMBER,
+    p_discount   IN NUMBER DEFAULT 0
+  );
+
+  PROCEDURE recalc_total(
+    p_booking_id IN NUMBER
+  );
+
+  FUNCTION booking_total(
+    p_booking_id IN NUMBER
+  ) RETURN NUMBER;
+
+END booking_pkg;
+
+
+
+
+
+
+CREATE OR REPLACE PACKAGE BODY booking_pkg AS
+
+  PROCEDURE create_booking(
+    p_booking_id  IN NUMBER,
+    p_customer_id IN NUMBER,
+    p_show_id     IN NUMBER
+  )
+  IS
+    v_cust REF customer_type;
+    v_show REF show_type;
+  BEGIN
+    -- Get customer REF (predefined exception: NO_DATA_FOUND if missing)
+    SELECT REF(c)
+    INTO v_cust
+    FROM CUSTOMER c
+    WHERE c.PersonID = p_customer_id;
+
+    -- Get show REF via view (avoid SHOW keyword issues)
+    SELECT REF(s)
+    INTO v_show
+    FROM SHOW_T s
+    WHERE s.ShowID = p_show_id;
+
+    -- Insert into object table safely
+    INSERT INTO BOOKING
+    SELECT booking_type(
+      p_booking_id,
+      SYSDATE,
+      0,
+      'Pending',
+      v_cust,
+      v_show
+    )
+    FROM dual;
+
+    DBMS_OUTPUT.PUT_LINE('Booking created: ' || p_booking_id);
+
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+      RAISE_APPLICATION_ERROR(-20001, 'Customer or Show not found');
+    WHEN DUP_VAL_ON_INDEX THEN
+      RAISE_APPLICATION_ERROR(-20002, 'Booking ID already exists');
+  END create_booking;
+
+
+  PROCEDURE add_seat(
+    p_booking_id IN NUMBER,
+    p_seat_id    IN NUMBER,
+    p_price      IN NUMBER,
+    p_discount   IN NUMBER DEFAULT 0
+  )
+  IS
+    v_exists NUMBER;
+    v_dummy  NUMBER;
+  BEGIN
+    -- Ensure booking exists (NO_DATA_FOUND if missing)
+    SELECT 1 INTO v_dummy
+    FROM BOOKING b
+    WHERE b.BookingID = p_booking_id;
+
+    -- Ensure seat exists (NO_DATA_FOUND if missing)
+    SELECT 1 INTO v_dummy
+    FROM SEAT s
+    WHERE s.SeatID = p_seat_id;
+
+    -- Prevent duplicates (user-defined exception)
+    SELECT COUNT(*)
+    INTO v_exists
+    FROM BOOKING_SEAT
+    WHERE BookingID = p_booking_id
+      AND SeatID    = p_seat_id;
+
+    IF v_exists > 0 THEN
+      RAISE_APPLICATION_ERROR(-20003, 'Seat already added to this booking');
+    END IF;
+
+    INSERT INTO BOOKING_SEAT(BookingID, SeatID, Price, Discount_Applied)
+    VALUES(p_booking_id, p_seat_id, p_price, p_discount);
+
+    DBMS_OUTPUT.PUT_LINE('Seat added: ' || p_seat_id || ' to booking ' || p_booking_id);
+
+  EXCEPTION
+    WHEN NO_DATA_FOUND THEN
+      RAISE_APPLICATION_ERROR(-20004, 'Booking or Seat not found');
+  END add_seat;
+
+
+  PROCEDURE recalc_total(
+    p_booking_id IN NUMBER
+  )
+  IS
+    v_total NUMBER;
+  BEGIN
+    SELECT NVL(SUM(NVL(Price,0) - NVL(Discount_Applied,0)), 0)
+    INTO v_total
+    FROM BOOKING_SEAT
+    WHERE BookingID = p_booking_id;
+
+    UPDATE BOOKING
+    SET TotalAmount = v_total
+    WHERE BookingID = p_booking_id;
+
+    IF SQL%ROWCOUNT = 0 THEN
+      RAISE_APPLICATION_ERROR(-20005, 'Booking not found');
+    END IF;
+
+    DBMS_OUTPUT.PUT_LINE('Total updated for booking ' || p_booking_id || ' = ' || v_total);
+  END recalc_total;
+
+
+  FUNCTION booking_total(
+    p_booking_id IN NUMBER
+  )
+  RETURN NUMBER
+  IS
+    v_total NUMBER;
+  BEGIN
+    SELECT NVL(SUM(NVL(Price,0) - NVL(Discount_Applied,0)), 0)
+    INTO v_total
+    FROM BOOKING_SEAT
+    WHERE BookingID = p_booking_id;
+
+    RETURN v_total;
+  END booking_total;
+
+END booking_pkg;
+
+
+
+
+
+BEGIN
+  booking_pkg.create_booking(7777, 101, 2001);
+  booking_pkg.add_seat(7777, 1001, 120, 0);
+  booking_pkg.add_seat(7777, 1002, 120, 10);
+  booking_pkg.recalc_total(7777);
+
+  DBMS_OUTPUT.PUT_LINE('Function total = ' || booking_pkg.booking_total(7777));
+END;
+
+
+
+
+
+----------------------------Package End---------------------------------------
+
+
+
+
